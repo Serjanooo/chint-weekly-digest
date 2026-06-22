@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title_options", "stories"],
+  "properties": {
+    "title_options": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"type": "string", "minLength": 3}},
+    "stories": {
+      "type": "array", "minItems": 8, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["candidate_id", "text", "source", "url", "published_date"],
+        "properties": {
+          "candidate_id": {"type": "string"},
+          "text": {"type": "string", "minLength": 40},
+          "source": {"type": "string"},
+          "url": {"type": "string"},
+          "published_date": {"type": "string"}
+        }
+      }
+    }
+  }
+}
+

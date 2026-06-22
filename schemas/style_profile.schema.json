@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["corpus_sha256", "corpus_summary", "topic_priorities", "issue_structure", "tone", "story_rules", "headline_rules", "fact_rules", "avoid", "headline_examples"],
+  "properties": {
+    "corpus_sha256": {"type": "string"},
+    "corpus_summary": {"type": "string"},
+    "topic_priorities": {"type": "array", "items": {"type": "string"}},
+    "issue_structure": {"type": "array", "items": {"type": "string"}},
+    "tone": {"type": "array", "items": {"type": "string"}},
+    "story_rules": {"type": "array", "items": {"type": "string"}},
+    "headline_rules": {"type": "array", "items": {"type": "string"}},
+    "fact_rules": {"type": "array", "items": {"type": "string"}},
+    "avoid": {"type": "array", "items": {"type": "string"}},
+    "headline_examples": {"type": "array", "minItems": 8, "items": {"type": "string"}}
+  }
+}
+
