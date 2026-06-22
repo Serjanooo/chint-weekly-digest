@@ -9,10 +9,12 @@
       "type": "array", "minItems": 8, "maxItems": 8,
       "items": {
         "type": "object", "additionalProperties": false,
-        "required": ["candidate_id", "text", "source", "url", "published_date"],
+        "required": ["candidate_id", "text", "link_text", "story_role", "source", "url", "published_date"],
         "properties": {
           "candidate_id": {"type": "string"},
           "text": {"type": "string", "minLength": 40},
+          "link_text": {"type": "string", "minLength": 2},
+          "story_role": {"type": "string", "enum": ["core", "entertaining"]},
           "source": {"type": "string"},
           "url": {"type": "string"},
           "published_date": {"type": "string"}
@@ -21,4 +23,3 @@
     }
   }
 }
-

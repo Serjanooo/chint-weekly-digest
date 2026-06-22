@@ -35,8 +35,13 @@ def generate(project: Path, articles: list[Article], start: date, end: date) -> 
     chosen_ids = [story.get("candidate_id") for story in result["stories"]]
     if len(set(chosen_ids)) != 8 or any(candidate_id not in by_id for candidate_id in chosen_ids):
         raise RuntimeError("Codex вернул повторяющийся или неизвестный candidate_id.")
+    if not any(story.get("story_role") == "entertaining" for story in result["stories"]):
+        raise RuntimeError("Codex не включил обязательную развлекательную технологическую новость.")
     # Metadata is authoritative and must never depend on model transcription.
     for story in result["stories"]:
+        link_text = story.get("link_text", "").strip()
+        if not link_text or story["text"].count(link_text) != 1:
+            raise RuntimeError(f"Некорректная глагольная ссылка в новости {story['candidate_id']}.")
         article = by_id[story["candidate_id"]]
         story["source"] = article.source
         story["url"] = article.url

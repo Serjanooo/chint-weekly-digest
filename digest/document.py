@@ -25,7 +25,7 @@ def _font(run, size: float, bold: bool = False, color: RGBColor = DARK, italic: 
     run.font.color.rgb = color
 
 
-def _hyperlink(paragraph, text: str, url: str):
+def _hyperlink(paragraph, text: str, url: str, size: float = 11):
     relationship = paragraph.part.relate_to(
         url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True
     )
@@ -33,11 +33,16 @@ def _hyperlink(paragraph, text: str, url: str):
     hyperlink.set(qn("r:id"), relationship)
     run = OxmlElement("w:r")
     props = OxmlElement("w:rPr")
+    fonts = OxmlElement("w:rFonts")
+    fonts.set(qn("w:ascii"), "Arial")
+    fonts.set(qn("w:hAnsi"), "Arial")
+    font_size = OxmlElement("w:sz")
+    font_size.set(qn("w:val"), str(int(size * 2)))
     color = OxmlElement("w:color")
     color.set(qn("w:val"), "0066B3")
     underline = OxmlElement("w:u")
     underline.set(qn("w:val"), "single")
-    props.extend([color, underline])
+    props.extend([fonts, font_size, color, underline])
     run.append(props)
     node = OxmlElement("w:t")
     node.text = text
@@ -108,13 +113,10 @@ def build_docx(data: dict, output: Path, start: date, end: date) -> Path:
         paragraph.paragraph_format.space_after = Pt(4)
         paragraph.paragraph_format.keep_together = True
         _font(paragraph.add_run("🔵 "), 11, True, BLUE)
-        _font(paragraph.add_run(story["text"]), 11)
-        source = document.add_paragraph()
-        source.paragraph_format.left_indent = Cm(0.65)
-        source.paragraph_format.space_after = Pt(9)
-        published_date = story["published_date"].split("T", 1)[0]
-        _font(source.add_run(f"Источник: {story['source']} · {published_date} · "), 8.5, color=MUTED)
-        _hyperlink(source, "открыть публикацию", story["url"])
+        before, link_text, after = story["text"].partition(story["link_text"])
+        _font(paragraph.add_run(before), 11)
+        _hyperlink(paragraph, link_text, story["url"])
+        _font(paragraph.add_run(after), 11)
 
     hashtag = document.add_paragraph()
     hashtag.paragraph_format.space_before = Pt(4)
