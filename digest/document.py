@@ -122,6 +122,13 @@ def build_docx(data: dict, output: Path, start: date, end: date) -> Path:
     hashtag.paragraph_format.space_before = Pt(4)
     _font(hashtag.add_run("#CHINT_Новости"), 11, True, BLUE)
 
+    if data.get("chint_russia_note"):
+        note = document.add_paragraph()
+        note.paragraph_format.space_before = Pt(18)
+        note.paragraph_format.space_after = Pt(6)
+        _font(note.add_run("Редакционная пометка: "), 9.5, True, MUTED)
+        _font(note.add_run(data["chint_russia_note"]), 9.5, color=MUTED, italic=True)
+
     footer = document.sections[-1].footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _font(footer.add_run("Сформировано локально с помощью Codex CLI"), 8, color=MUTED)

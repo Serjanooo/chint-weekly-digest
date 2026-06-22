@@ -8,7 +8,10 @@ version = "1.0.0"
 description = "Weekly Russian-language news digest generator for CHINT Russia, powered by Codex CLI"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["python-docx>=1.1.0"]
+dependencies = [
+  "googlenewsdecoder>=0.1.7,<0.2",
+  "python-docx>=1.1.0"
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
@@ -21,4 +24,3 @@ include = ["digest*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-

@@ -1,12 +1,18 @@
 {
-  "candidate_limit": 80,
+  "candidate_limit": 60,
+  "url_resolver_workers": 6,
+  "chint_russia_boost": 20,
+  "chint_source_domains": ["elec.ru", "ruscable.ru", "companies.rbc.ru"],
   "direct_feeds": [
     {"name": "РБК", "url": "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"},
     {"name": "ТАСС", "url": "https://tass.ru/rss/v2.xml"},
     {"name": "Интерфакс", "url": "https://www.interfax.ru/rss.asp"},
     {"name": "Forbes Russia", "url": "https://www.forbes.ru/newrss.xml"},
     {"name": "Коммерсантъ", "url": "https://www.kommersant.ru/RSS/news.xml"},
-    {"name": "CNews", "url": "https://www.cnews.ru/inc/rss/news.xml"}
+    {"name": "CNews", "url": "https://www.cnews.ru/inc/rss/news.xml"},
+    {"name": "Ведомости", "url": "https://www.vedomosti.ru/rss/news"},
+    {"name": "N + 1", "url": "https://nplus1.ru/rss"},
+    {"name": "Хабр", "url": "https://habr.com/ru/rss/news/?fl=ru"}
   ],
   "search_queries": [
     "энергетика Россия Китай",
@@ -18,7 +24,20 @@
     "Россия Китай инфраструктура технологии",
     "современные технологии энергетика",
     "Китай робот ИИ необычная инновация",
-    "Китай забавная технология робот электричество"
+    "Китай забавная технология робот электричество",
+    "site:elec.ru CHINT",
+    "site:ruscable.ru CHINT",
+    "site:companies.rbc.ru CHINT"
+  ],
+  "preferred_domains": [
+    "interfax.ru", "tass.ru", "kommersant.ru", "rbc.ru", "scmp.com",
+    "vedomosti.ru", "elec.ru", "neftegaz.ru", "iz.ru", "expert.ru",
+    "forbes.ru", "comnews.ru", "vc.ru", "smotrim.ru", "lenta.ru",
+    "habr.com", "bfm.ru", "rg.ru", "ruscable.ru", "renen.ru",
+    "nplus1.ru", "ixbt.com", "ferra.ru", "cnews.ru", "bigasia.ru",
+    "3dnews.ru", "servernews.ru", "eprussia.ru", "atomic-energy.ru",
+    "atominfo.ru", "rosatom.ru", "minenergo.gov.ru", "russian.news.cn",
+    "people.com.cn", "monocle.ru", "energypolicy.ru", "energyland.info"
   ],
   "source_weights": {
     "ТАСС": 2.5,
@@ -30,6 +49,7 @@
     "CNews": 1.8
   },
   "topic_keywords": [
+    {"weight": 10.0, "terms": ["chint"]},
     {"weight": 4.0, "terms": ["энерг", "электр", "генерац", "энергосет", "лэп", "аэс", "тэс", "гэс", "солнеч", "ветро", "накопител", "аккумулятор"]},
     {"weight": 4.0, "terms": ["цод", "дата-центр", "data center", "сервер", "вычислительн", "облачн"]},
     {"weight": 3.2, "terms": ["искусственн", "нейросет", "ии ", "алгоритм", "машинн", "робот", "чип", "квант"]},

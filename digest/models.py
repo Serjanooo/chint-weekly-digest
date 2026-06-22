@@ -15,9 +15,10 @@ class Article:
     summary: str
     query: str = ""
     score: float = 0.0
+    source_home: str = ""
+    is_chint_russia: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["published_at"] = self.published_at.isoformat()
         return result
-

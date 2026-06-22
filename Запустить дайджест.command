@@ -28,7 +28,7 @@ if [[ ! -x ".venv/bin/python" ]]; then
   }
 fi
 
-if ! .venv/bin/python -c "import digest, docx" >/dev/null 2>&1; then
+if ! .venv/bin/python -c "import digest, docx, googlenewsdecoder" >/dev/null 2>&1; then
   echo "Устанавливаю компоненты программы..."
   .venv/bin/python -m pip install -e . || {
     echo "Не удалось установить компоненты программы."

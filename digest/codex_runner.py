@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
+import urllib.parse
 from datetime import date
 from pathlib import Path
 
@@ -37,13 +38,23 @@ def generate(project: Path, articles: list[Article], start: date, end: date) -> 
         raise RuntimeError("Codex вернул повторяющийся или неизвестный candidate_id.")
     if not any(story.get("story_role") == "entertaining" for story in result["stories"]):
         raise RuntimeError("Codex не включил обязательную развлекательную технологическую новость.")
+    chint_ids = {article.id for article in articles if article.is_chint_russia}
+    if chint_ids and not chint_ids.intersection(chosen_ids):
+        raise RuntimeError("Codex пропустил найденную новость о CHINT в России.")
     # Metadata is authoritative and must never depend on model transcription.
     for story in result["stories"]:
         link_text = story.get("link_text", "").strip()
         if not link_text or story["text"].count(link_text) != 1:
             raise RuntimeError(f"Некорректная глагольная ссылка в новости {story['candidate_id']}.")
         article = by_id[story["candidate_id"]]
+        if (urllib.parse.urlparse(article.url).hostname or "").endswith("google.com"):
+            raise RuntimeError("В финальный выпуск попала ссылка Google вместо прямой ссылки на СМИ.")
         story["source"] = article.source
         story["url"] = article.url
         story["published_date"] = article.published_at.date().isoformat()
+    result["chint_russia_included"] = bool(chint_ids)
+    result["chint_russia_note"] = "" if chint_ids else (
+        f"За период {start.strftime('%d.%m.%Y')}–{end.strftime('%d.%m.%Y')} "
+        "публичных новостей о CHINT в России не найдено."
+    )
     return result
