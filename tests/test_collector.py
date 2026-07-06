@@ -1,6 +1,9 @@
 from datetime import date
 
 from digest.collector import (
+    _collect_chint_owned_channel,
+    _editorial_policy_flags,
+    _has_hard_exclusion,
     _google_news_url,
     _date_from_url,
     _is_chint_russia,
@@ -85,10 +88,108 @@ def test_google_url_with_untrusted_domain_is_rejected(monkeypatch):
 
 def test_any_chint_mention_on_approved_russian_site_is_marked():
     approved = Article(
-        "1", "CHINT построил новый завод", "https://elec.ru/a", "Elec.ru", datetime.now(timezone.utc), ""
+        "1", "CHINT построил новый завод", "https://elec.ru/news/2026/06/17/a", "Elec.ru", datetime.now(timezone.utc), ""
     )
     unapproved = Article(
         "2", "CHINT построил новый завод", "https://example.com/b", "Example", datetime.now(timezone.utc), ""
     )
     assert _is_chint_russia(approved)
     assert not _is_chint_russia(unapproved)
+
+
+def test_chint_market_page_is_not_marked_as_news():
+    article = Article(
+        "1",
+        "Контактор Chint купить в Маркете",
+        "https://www.elec.ru/market/kontaktor-chint.html",
+        "Elec.ru",
+        datetime.now(timezone.utc),
+        "",
+    )
+    assert not _is_chint_russia(article)
+
+
+def test_blocked_organization_is_hard_excluded():
+    config = {
+        "editorial_policy": {
+            "blocked_organization_terms": ["Meta"],
+            "political_terms": [],
+            "other_company_terms": [],
+            "hard_exclude_flags": ["blocked_organization", "politics"],
+        }
+    }
+    article = Article(
+        "1",
+        "Meta построит солнечную электростанцию для ИИ-ЦОД",
+        "https://example.com/a",
+        "Test",
+        datetime.now(timezone.utc),
+        "",
+    )
+    article.policy_flags = _editorial_policy_flags(article, config)
+    assert "blocked_organization:Meta" in article.policy_flags
+    assert _has_hard_exclusion(article, config)
+
+
+def test_political_story_is_hard_excluded_by_stem():
+    config = {
+        "editorial_policy": {
+            "blocked_organization_terms": [],
+            "political_terms": ["санкц*", "БРИКС"],
+            "other_company_terms": [],
+            "hard_exclude_flags": ["blocked_organization", "politics"],
+        }
+    }
+    article = Article(
+        "1",
+        "Страны БРИКС обсудили санкционный режим",
+        "https://example.com/a",
+        "Test",
+        datetime.now(timezone.utc),
+        "",
+    )
+    article.policy_flags = _editorial_policy_flags(article, config)
+    assert "politics:БРИКС" in article.policy_flags
+    assert "politics:санкц*" in article.policy_flags
+    assert _has_hard_exclusion(article, config)
+
+
+def test_other_company_penalty_pushes_story_down():
+    config = {
+        "topic_keywords": [{"weight": 4, "terms": ["цод"]}],
+        "source_weights": {},
+        "negative_keywords": [],
+        "editorial_policy": {
+            "blocked_organization_terms": [],
+            "political_terms": [],
+            "other_company_terms": ["Sitronics"],
+            "other_company_penalty": 12,
+        },
+    }
+    article = Article(
+        "1",
+        "Sitronics разработала шинопровод для ЦОД",
+        "https://example.com/a",
+        "Test",
+        datetime.now(timezone.utc),
+        "",
+    )
+    assert _score(article, config) < 0
+
+
+def test_chint_owned_channel_post_is_collected(monkeypatch):
+    html = '''
+    <div class="tgme_widget_message js-widget_message" data-post="chintrussia/582">
+      <div class="link_preview_title">Обзор реле CHINT NJX6 и NJX12</div>
+      <div class="link_preview_description">Компактные решения для автоматизации и защиты контроллеров.</div>
+      <div class="tgme_widget_message_text">Вышел видеообзор новых реле CHINT.</div>
+      <time datetime="2026-06-25T14:04:18+00:00">14:04</time>
+    </div>
+    '''.encode()
+    monkeypatch.setattr("digest.collector._fetch", lambda _: html)
+    config = {"own_channel": {"enabled": True, "url": "https://t.me/s/chintrussia"}}
+    articles, warnings = _collect_chint_owned_channel(config, date(2026, 6, 23), date(2026, 6, 29))
+    assert not warnings
+    assert len(articles) == 1
+    assert articles[0].is_chint_owned
+    assert articles[0].url == "https://t.me/chintrussia/582"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 import urllib.parse
@@ -8,6 +9,50 @@ from datetime import date
 from pathlib import Path
 
 from .models import Article
+
+WORD_CHARS = "0-9a-zа-яё"
+
+
+def _term_matches(text: str, term: str) -> bool:
+    normalized = text.lower().replace("ё", "е")
+    needle = term.lower().replace("ё", "е").strip()
+    if not needle:
+        return False
+    if needle.endswith("*"):
+        base = needle[:-1]
+        return bool(base) and re.search(rf"(?<![{WORD_CHARS}]){re.escape(base)}", normalized) is not None
+    if re.fullmatch(rf"[{WORD_CHARS}\-]+", needle):
+        return re.search(rf"(?<![{WORD_CHARS}]){re.escape(needle)}(?![{WORD_CHARS}])", normalized) is not None
+    return needle in normalized
+
+
+def _find_terms(text: str, terms: list[str]) -> list[str]:
+    return [term for term in terms if _term_matches(text, term)]
+
+
+def _validate_editorial_policy(result: dict, articles_by_id: dict[str, Article], policy: dict) -> None:
+    blocked_prefixes = {"blocked_organization", "politics", "incident"}
+    for story in result.get("stories", []):
+        article = articles_by_id[story["candidate_id"]]
+        blocked_flags = [flag for flag in article.policy_flags if flag.split(":", 1)[0] in blocked_prefixes]
+        if blocked_flags:
+            raise RuntimeError(
+                f"В выпуск попала новость, запрещённая редакционной политикой: {', '.join(blocked_flags)}."
+            )
+
+    generated_text = "\n".join(
+        [*(result.get("title_options") or []), *[story.get("text", "") for story in result.get("stories", [])]]
+    )
+    checks = {
+        "запрещённые организации": policy.get("blocked_organization_terms", []),
+        "политические маркеры": policy.get("political_terms", []),
+        "аварийные и криминальные маркеры": policy.get("incident_terms", []),
+        "названия сторонних компаний": policy.get("other_company_terms", []),
+    }
+    for label, terms in checks.items():
+        matches = _find_terms(generated_text, terms)
+        if matches:
+            raise RuntimeError(f"Codex упомянул {label}: {', '.join(matches)}.")
 
 
 def generate(project: Path, articles: list[Article], start: date, end: date) -> dict:
@@ -41,6 +86,11 @@ def generate(project: Path, articles: list[Article], start: date, end: date) -> 
     chint_ids = {article.id for article in articles if article.is_chint_russia}
     if chint_ids and not chint_ids.intersection(chosen_ids):
         raise RuntimeError("Codex пропустил найденную новость о CHINT в России.")
+    owned_chint_ids = {article.id for article in articles if article.is_chint_owned}
+    if not chint_ids and owned_chint_ids and not owned_chint_ids.intersection(chosen_ids):
+        raise RuntimeError("Codex пропустил найденный собственный инфоповод CHINT Russia.")
+    policy = json.loads((project / "config" / "sources.json").read_text(encoding="utf-8")).get("editorial_policy", {})
+    _validate_editorial_policy(result, by_id, policy)
     # Metadata is authoritative and must never depend on model transcription.
     for story in result["stories"]:
         link_text = story.get("link_text", "").strip()
@@ -53,6 +103,7 @@ def generate(project: Path, articles: list[Article], start: date, end: date) -> 
         story["url"] = article.url
         story["published_date"] = article.published_at.date().isoformat()
     result["chint_russia_included"] = bool(chint_ids)
+    result["chint_owned_included"] = bool(owned_chint_ids.intersection(chosen_ids))
     result["chint_russia_note"] = "" if chint_ids else (
         f"За период {start.strftime('%d.%m.%Y')}–{end.strftime('%d.%m.%Y')} "
         "публичных новостей о CHINT в России не найдено."

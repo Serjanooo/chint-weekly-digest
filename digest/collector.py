@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from difflib import SequenceMatcher
@@ -23,6 +23,7 @@ USER_AGENT = "Mozilla/5.0 (compatible; CHINTDigest/1.0; +https://github.com/)"
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
 URL_DATE_RE = re.compile(r"/(20\d{2})/(\d{2})/(\d{2})/")
+WORD_CHARS = "0-9a-zа-яё"
 
 
 def load_config(path: Path) -> dict:
@@ -43,6 +44,54 @@ def _clean(value: str | None) -> str:
     if not value:
         return ""
     return SPACE_RE.sub(" ", html.unescape(TAG_RE.sub(" ", value))).strip()
+
+
+def _term_matches(text: str, term: str) -> bool:
+    normalized = text.lower().replace("ё", "е")
+    needle = term.lower().replace("ё", "е").strip()
+    if not needle:
+        return False
+    if needle.endswith("*"):
+        base = needle[:-1]
+        return bool(base) and re.search(rf"(?<![{WORD_CHARS}]){re.escape(base)}", normalized) is not None
+    if re.fullmatch(rf"[{WORD_CHARS}\-]+", needle):
+        return re.search(rf"(?<![{WORD_CHARS}]){re.escape(needle)}(?![{WORD_CHARS}])", normalized) is not None
+    return needle in normalized
+
+
+def _matching_terms(text: str, terms: list[str]) -> list[str]:
+    return [term for term in terms if _term_matches(text, term)]
+
+
+def _article_text(article: Article) -> str:
+    return f"{article.title} {article.summary} {article.source}".lower().replace("ё", "е")
+
+
+def _editorial_policy_flags(article: Article, config: dict) -> list[str]:
+    policy = config.get("editorial_policy", {})
+    text = _article_text(article)
+    flags: list[str] = []
+    categories = (
+        ("blocked_organization", policy.get("blocked_organization_terms", [])),
+        ("politics", policy.get("political_terms", [])),
+        ("incident", policy.get("incident_terms", [])),
+        ("other_company", policy.get("other_company_terms", [])),
+    )
+    for category, terms in categories:
+        for term in _matching_terms(text, terms):
+            flags.append(f"{category}:{term}")
+    return flags
+
+
+def _has_hard_exclusion(article: Article, config: dict) -> bool:
+    policy = config.get("editorial_policy", {})
+    prefixes = set(policy.get("hard_exclude_flags", ["blocked_organization", "politics", "incident"]))
+    return any(flag.split(":", 1)[0] in prefixes for flag in article.policy_flags)
+
+
+def _has_excluded_url(article: Article, config: dict) -> bool:
+    url = article.url.lower()
+    return any(pattern.lower() in url for pattern in config.get("excluded_url_contains", []))
 
 
 def _child_text(item: ET.Element, names: tuple[str, ...]) -> str:
@@ -172,6 +221,76 @@ def _collect_chint_sources(start: date, end: date) -> tuple[list[Article], list[
     return articles, warnings
 
 
+def _class_block_text(chunk: str, class_name: str) -> str:
+    match = re.search(
+        rf'<[^>]+class=["\'][^"\']*\b{re.escape(class_name)}\b[^"\']*["\'][^>]*>(.*?)</[^>]+>',
+        chunk,
+        re.I | re.S,
+    )
+    if not match:
+        return ""
+    fragment = re.sub(r"<br\s*/?>", "\n", match.group(1), flags=re.I)
+    return _clean(fragment)
+
+
+def _collect_chint_owned_channel(config: dict, start: date, end: date) -> tuple[list[Article], list[str]]:
+    channel = config.get("own_channel", {})
+    if not channel.get("enabled", True):
+        return [], []
+    url = channel.get("url")
+    if not url:
+        return [], []
+    window_start = start - timedelta(days=int(channel.get("lookback_days", 0)))
+
+    warnings: list[str] = []
+    articles: list[Article] = []
+    try:
+        page = _fetch(url).decode("utf-8", errors="ignore")
+    except Exception as exc:
+        return [], [f"Собственный канал CHINT Russia: {exc}"]
+
+    starts = [match.start() for match in re.finditer(r'<div class="tgme_widget_message\b[^>]*data-post=', page)]
+    for index, start_pos in enumerate(starts):
+        end_pos = starts[index + 1] if index + 1 < len(starts) else len(page)
+        chunk = page[start_pos:end_pos]
+        post_match = re.search(r'data-post=["\']([^"\']+)["\']', chunk)
+        date_match = re.search(r'<time[^>]+datetime=["\']([^"\']+)["\']', chunk)
+        if not post_match or not date_match:
+            continue
+        published = _parse_date(date_match.group(1))
+        if not published or not (window_start <= published.date() <= end):
+            continue
+
+        post_path = post_match.group(1)
+        post_url = urllib.parse.urljoin("https://t.me/", post_path)
+        message_text = _class_block_text(chunk, "tgme_widget_message_text")
+        preview_title = _class_block_text(chunk, "link_preview_title")
+        preview_description = _class_block_text(chunk, "link_preview_description")
+        summary = SPACE_RE.sub(" ", " ".join(part for part in [message_text, preview_description] if part)).strip()
+        title = preview_title or summary.split(". ", 1)[0][:140].strip()
+        if not title or len(summary) < 20:
+            continue
+
+        article_id = hashlib.sha1(f"{title}|{post_url}".encode()).hexdigest()[:12]
+        articles.append(
+            Article(
+                article_id,
+                title,
+                post_url,
+                channel.get("name", "CHINT Russia"),
+                published,
+                summary[:5000],
+                query="own_channel",
+                source_home=channel.get("source_home", "https://t.me/chintrussia"),
+                is_chint_owned=True,
+            )
+        )
+
+    if not articles:
+        warnings.append("Собственный канал CHINT Russia: за период не найдено открытых постов.")
+    return articles, warnings
+
+
 def parse_feed(payload: bytes, label: str, query: str = "") -> list[Article]:
     root = ET.fromstring(payload.lstrip(b"\xef\xbb\xbf"))
     articles: list[Article] = []
@@ -270,7 +389,16 @@ def _is_chint_russia(article: Article, source_domains: list[str] | None = None) 
     source_domains = source_domains or ["elec.ru", "ruscable.ru", "companies.rbc.ru"]
     text = f"{article.title} {article.summary}".lower().replace("ё", "е")
     source_host = _hostname(article.source_home) or _hostname(article.url)
-    return "chint" in text and _domain_allowed(source_host, source_domains)
+    if "chint" not in text or not _domain_allowed(source_host, source_domains):
+        return False
+    path = urllib.parse.urlparse(article.url).path.lower()
+    if source_host == "elec.ru":
+        return path.startswith("/news/")
+    if source_host == "ruscable.ru":
+        return path.startswith("/news/")
+    if source_host == "companies.rbc.ru":
+        return path.startswith("/news/")
+    return True
 
 
 def _score(article: Article, config: dict) -> float:
@@ -286,8 +414,15 @@ def _score(article: Article, config: dict) -> float:
     for penalty in config.get("negative_keywords", []):
         matches = sum(1 for word in penalty["terms"] if word.lower().replace("ё", "е") in haystack)
         score -= min(matches, 3) * float(penalty["weight"])
+    if not article.policy_flags:
+        article.policy_flags = _editorial_policy_flags(article, config)
+    company_flags = [flag for flag in article.policy_flags if flag.startswith("other_company:")]
+    if company_flags and not article.is_chint_russia and not article.is_chint_owned:
+        score -= min(len(company_flags), 3) * float(config.get("editorial_policy", {}).get("other_company_penalty", 12))
     if article.is_chint_russia:
         score += float(config.get("chint_russia_boost", 20))
+    if article.is_chint_owned:
+        score += float(config.get("chint_owned_boost", 16))
     return score
 
 
@@ -308,6 +443,10 @@ def collect(config: dict, start: date, end_inclusive: date) -> tuple[list[Articl
     found.extend(chint_articles)
     warnings.extend(chint_warnings)
 
+    owned_articles, owned_warnings = _collect_chint_owned_channel(config, start, end_inclusive)
+    found.extend(owned_articles)
+    warnings.extend(owned_warnings)
+
     for query in config["search_queries"]:
         try:
             url = _google_news_url(query, start, end_exclusive)
@@ -315,15 +454,29 @@ def collect(config: dict, start: date, end_inclusive: date) -> tuple[list[Articl
         except Exception as exc:
             warnings.append(f"Google News ({query}): {exc}")
 
-    dated = [article for article in found if start_dt <= article.published_at < end_dt]
+    own_lookback_days = int(config.get("own_channel", {}).get("lookback_days", 0))
+    own_start_dt = datetime.combine(start - timedelta(days=own_lookback_days), time.min, tzinfo=timezone.utc)
+    dated = [
+        article for article in found
+        if (own_start_dt if article.is_chint_owned else start_dt) <= article.published_at < end_dt
+    ]
+    eligible: list[Article] = []
+    hard_excluded = 0
     for article in dated:
         article.is_chint_russia = _is_chint_russia(article, config["chint_source_domains"])
+        article.policy_flags = _editorial_policy_flags(article, config)
+        if _has_hard_exclusion(article, config) or _has_excluded_url(article, config):
+            hard_excluded += 1
+            continue
         article.score = _score(article, config)
-    dated.sort(key=lambda item: (item.score, item.published_at), reverse=True)
+        eligible.append(article)
+    if hard_excluded:
+        warnings.append(f"Исключено по редакционной политике: {hard_excluded}")
+    eligible.sort(key=lambda item: (item.score, item.published_at), reverse=True)
 
     unique: list[Article] = []
     normalized: list[str] = []
-    for article in dated:
+    for article in eligible:
         current = _normalize_title(article.title)
         if any(SequenceMatcher(None, current, previous).ratio() >= 0.82 for previous in normalized):
             continue
@@ -341,7 +494,14 @@ def collect(config: dict, start: date, end_inclusive: date) -> tuple[list[Articl
     failed_count = sum(1 for article in resolved if article is None)
     if failed_count:
         warnings.append(f"Исключено Google News-карточек без прямой ссылки на СМИ: {failed_count}")
-    direct_articles = [article for article in resolved if article is not None]
+    direct_articles = []
+    for article in resolved:
+        if article is None:
+            continue
+        article.policy_flags = _editorial_policy_flags(article, config)
+        if _has_hard_exclusion(article, config) or _has_excluded_url(article, config):
+            continue
+        direct_articles.append(article)
     for article in direct_articles:
         article.is_chint_russia = _is_chint_russia(article, config["chint_source_domains"])
         article.score = _score(article, config)

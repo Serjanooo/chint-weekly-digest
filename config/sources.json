@@ -2,7 +2,53 @@
   "candidate_limit": 60,
   "url_resolver_workers": 6,
   "chint_russia_boost": 20,
+  "chint_owned_boost": 16,
   "chint_source_domains": ["elec.ru", "ruscable.ru", "companies.rbc.ru"],
+  "excluded_url_contains": ["/market/"],
+  "own_channel": {
+    "enabled": true,
+    "name": "CHINT Russia",
+    "url": "https://t.me/s/chintrussia",
+    "source_home": "https://t.me/chintrussia",
+    "lookback_days": 7
+  },
+  "editorial_policy": {
+    "blocked_organization_terms": [
+      "Meta", "Meta Platforms", "Facebook", "Instagram"
+    ],
+    "political_terms": [
+      "БРИКС", "санкц*", "пошлин*", "НАТО", "саммит", "выборы",
+      "Госдума", "Совфед", "депутат*", "партия", "геополит*",
+      "переговор*", "законопроект*", "МИД", "правительств*",
+      "Минобороны", "Шойгу", "армия", "военн*", "боев*", "СВО",
+      "ДНР", "ЛНР", "Харьков*", "Чернигов*", "Сумск*", "удар*",
+      "обстрел*", "МВД", "мошенник*", "уголовн*", "кибератак*",
+      "власт*", "госсектор", "государственн*", "Соцфонд",
+      "приватизац*", "религиозн*", "БПЛА", "атаки", "запрет*",
+      "Путин*", "Песков", "Трамп", "Зеленск*", "посольств*",
+      "США", "Турци*", "ипотечн*", "налог*", "Минцифры"
+    ],
+    "incident_terms": [
+      "авари*", "обесточ*", "погиб*", "банкрот*", "суд",
+      "оспариван*", "криминал*", "утечк*"
+    ],
+    "other_company_terms": [
+      "Sitronics", "Ситроникс", "GS Group", "Google", "Microsoft",
+      "OpenAI", "Nvidia", "Apple", "Amazon", "Tesla", "Huawei",
+      "Яндекс", "Yandex", "Сбер", "VK", "ВКонтакте", "YouTube",
+      "RuTube", "Дзен", "Ростелеком", "Росатом", "Газпром",
+      "Роснефть", "РусГидро", "Россети", "Почта России",
+      "М.Видео", "iPhone", "UBTech", "Alibaba", "Tencent",
+      "ByteDance", "Xiaomi", "ОСК", "ПСБ", "Джэт",
+      "АвалонЭлектроТех", "Nexta",
+      "РИВЦ-Пулково", "IEK", "IEK GROUP", "Элемент",
+      "China Fusion", "Билайн", "НИУ ВШЭ", "ВШЭ", "ФНП",
+      "НЭК ТЕХ", "СНИИП", "Всемирный экономический форум",
+      "Nissan", "Oracle"
+    ],
+    "hard_exclude_flags": ["blocked_organization", "politics", "incident"],
+    "other_company_penalty": 12
+  },
   "direct_feeds": [
     {"name": "РБК", "url": "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"},
     {"name": "ТАСС", "url": "https://tass.ru/rss/v2.xml"},

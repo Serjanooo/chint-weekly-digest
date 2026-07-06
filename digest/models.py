@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +17,8 @@ class Article:
     score: float = 0.0
     source_home: str = ""
     is_chint_russia: bool = False
+    is_chint_owned: bool = False
+    policy_flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
