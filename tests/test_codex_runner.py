@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from digest.codex_runner import _validate_editorial_policy
+from digest.codex_runner import _find_terms, _validate_editorial_policy
 from digest.models import Article
 
 
@@ -42,3 +42,15 @@ def test_generated_company_name_is_rejected():
             {"1": _article()},
             {"blocked_organization_terms": [], "political_terms": [], "other_company_terms": ["Sitronics"]},
         )
+
+
+def test_industrial_batch_is_not_treated_as_political_party():
+    terms = ["Госдум*", "политическая партия", "политические партии"]
+    text = "Это уже не демонстрация прототипа, а партия техники для реального маршрута."
+    assert _find_terms(text, terms) == []
+
+
+def test_political_inflections_are_still_detected():
+    terms = ["Госдум*", "политическая партия", "политические партии"]
+    assert _find_terms("Проект закона принят Госдумой.", terms) == ["Госдум*"]
+    assert _find_terms("Политическая партия выдвинула кандидата.", terms) == ["политическая партия"]
