@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import subprocess
 import tempfile
 import urllib.parse
@@ -55,6 +57,55 @@ def _validate_editorial_policy(result: dict, articles_by_id: dict[str, Article],
             raise RuntimeError(f"Codex упомянул {label}: {', '.join(matches)}.")
 
 
+def _codex_executable() -> str:
+    configured = os.environ.get("CODEX_BIN")
+    if configured:
+        return configured
+
+    found = shutil.which("codex")
+    if found:
+        return found
+
+    if os.name == "nt":
+        search_roots = [
+            os.environ.get("APPDATA"),
+            os.environ.get("LOCALAPPDATA"),
+            os.environ.get("ProgramFiles"),
+            os.environ.get("ProgramFiles(x86)"),
+        ]
+        candidates = []
+        for root in search_roots:
+            if not root:
+                continue
+            candidates.extend(
+                [
+                    Path(root) / "npm" / "codex.cmd",
+                    Path(root) / "npm" / "codex.exe",
+                    Path(root) / "Codex" / "codex.exe",
+                    Path(root) / "Programs" / "Codex" / "codex.exe",
+                ]
+            )
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+
+    app_bundle = Path("/Applications/Codex.app/Contents/Resources/codex")
+    if app_bundle.exists():
+        return str(app_bundle)
+
+    raise RuntimeError(
+        "Codex CLI не найден. Установите Codex CLI, войдите в аккаунт и проверьте, "
+        "что команда codex доступна в PATH. Можно также указать путь через переменную CODEX_BIN."
+    )
+
+
+def _codex_command() -> list[str]:
+    executable = _codex_executable()
+    if os.name == "nt" and Path(executable).suffix.lower() in {".bat", ".cmd"}:
+        return [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", executable]
+    return [executable]
+
+
 def generate(project: Path, articles: list[Article], start: date, end: date) -> dict:
     if len(articles) < 8:
         raise RuntimeError(f"Собрано только {len(articles)} уникальных релевантных новостей; нужно минимум 8.")
@@ -69,7 +120,7 @@ def generate(project: Path, articles: list[Article], start: date, end: date) -> 
     with tempfile.TemporaryDirectory(prefix="chint-digest-") as temp:
         output = Path(temp) / "digest.json"
         command = [
-            "codex", "exec", "--ephemeral", "--skip-git-repo-check", "-s", "read-only",
+            *_codex_command(), "exec", "--ephemeral", "--skip-git-repo-check", "-s", "read-only",
             "-C", str(project), "--output-schema", str(project / "schemas" / "digest.schema.json"),
             "-o", str(output), "-",
         ]

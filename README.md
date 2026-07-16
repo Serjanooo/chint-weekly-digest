@@ -17,7 +17,7 @@
 
 ## Установка
 
-Нужны Python 3.10+, Microsoft Word или LibreOffice для просмотра результата и установленный Codex CLI с выполненным входом.
+Нужны Python 3.10+, Microsoft Word или LibreOffice для просмотра результата и установленный Codex CLI с выполненным входом. Программа работает на macOS и Windows.
 
 ```bash
 cd /path/to/Digest
@@ -32,6 +32,22 @@ codex --version
 ### Двойным кликом на macOS
 
 Откройте папку проекта в Finder и дважды нажмите `Запустить дайджест.command`. Скрипт сам подготовит окружение при первом запуске, сформирует выпуск и откроет готовый Word-файл. Окно Terminal можно закрыть после сообщения об успешном завершении.
+
+### Двойным кликом на Windows
+
+Откройте папку проекта в Проводнике и дважды нажмите `Запустить дайджест Windows.bat`. Скрипт запустит PowerShell, сам создаст `.venv`, установит зависимости, сформирует выпуск и откроет готовый Word-файл.
+
+Перед первым запуском на Windows проверьте:
+
+- установлен Python 3.10+ с включённым пунктом `Add python.exe to PATH`;
+- установлен и авторизован Codex CLI;
+- команда `codex --version` работает в PowerShell.
+
+Если Codex CLI установлен, но команда `codex` не видна в PATH, укажите путь вручную:
+
+```powershell
+$env:CODEX_BIN = "C:\Path\To\codex.cmd"
+```
 
 ### Из терминала
 
@@ -58,6 +74,13 @@ chint-digest render outputs/digest_2026-06-15_2026-06-21.json
 
 # Обновить профиль при замене обучающего документа
 chint-digest init-profile --force
+```
+
+В Windows те же команды можно запускать из PowerShell после активации окружения:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m digest.cli weekly
 ```
 
 `weekly` показывает этапы работы и в конце печатает пути к `.docx` и `.json`. Если новостей мало, программа завершится с понятной ошибкой и сохранит собранные материалы для диагностики.
@@ -90,6 +113,8 @@ chint-digest init-profile --force
 - `profile/style_profile.json` — выученный стиль.
 - `prompts/generate_digest.md` — редакционное задание Codex.
 - `schemas/digest.schema.json` — строгий формат результата.
+- `Запустить дайджест.command` — запуск двойным кликом на macOS.
+- `Запустить дайджест Windows.bat` и `scripts/run_digest_windows.ps1` — запуск двойным кликом на Windows.
 
 Чтобы добавить источник, внесите его RSS в `direct_feeds`. Чтобы расширить запреты, правьте блок `editorial_policy`: `blocked_organization_terms`, `political_terms`, `incident_terms` и `other_company_terms`. Символ `*` в конце слова означает поиск по началу слова, например `санкц*`.
 
