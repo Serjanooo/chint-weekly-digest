@@ -20,7 +20,6 @@ def _article(policy_flags=None):
 
 def test_selected_blocked_candidate_is_rejected():
     result = {
-        "title_options": [f"Заголовок {index}" for index in range(10)],
         "stories": [{"candidate_id": "1", "text": "Нейтральная новость про энергетику."}],
     }
     with pytest.raises(RuntimeError, match="редакционной политикой"):
@@ -33,7 +32,6 @@ def test_selected_blocked_candidate_is_rejected():
 
 def test_generated_company_name_is_rejected():
     result = {
-        "title_options": [f"Заголовок {index}" for index in range(10)],
         "stories": [{"candidate_id": "1", "text": "Компания Sitronics разработала решение для ЦОД."}],
     }
     with pytest.raises(RuntimeError, match="сторонних компаний"):

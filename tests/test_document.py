@@ -6,7 +6,6 @@ from digest.document import build_docx
 
 def test_story_link_is_embedded_in_verb(tmp_path):
     data = {
-        "title_options": [f"Заголовок {index}" for index in range(1, 11)],
         "stories": [
             {
                 "candidate_id": str(index),
@@ -17,21 +16,22 @@ def test_story_link_is_embedded_in_verb(tmp_path):
                 "url": f"https://example.com/{index}",
                 "published_date": "2026-06-21",
             }
-            for index in range(8)
+            for index in range(10)
         ],
     }
     output = tmp_path / "digest.docx"
     build_docx(data, output, date(2026, 6, 15), date(2026, 6, 21))
     with ZipFile(output) as archive:
         xml = archive.read("word/document.xml").decode("utf-8")
-    assert xml.count("<w:hyperlink") == 8
-    assert xml.count(">разработала<") == 8
+    assert xml.count("<w:hyperlink") == 10
+    assert xml.count(">разработала<") == 10
     assert "Источник:" not in xml
+    assert "10 вариантов заголовка" not in xml
+    assert "Основной вариант заголовка" not in xml
 
 
 def test_missing_chint_note_is_added(tmp_path):
     data = {
-        "title_options": [f"Заголовок {index}" for index in range(1, 11)],
         "stories": [
             {
                 "candidate_id": str(index),
@@ -42,7 +42,7 @@ def test_missing_chint_note_is_added(tmp_path):
                 "url": f"https://example.com/{index}",
                 "published_date": "2026-06-21",
             }
-            for index in range(8)
+            for index in range(10)
         ],
         "chint_russia_note": "Новостей о CHINT в России не найдено.",
     }

@@ -13,6 +13,7 @@ from pathlib import Path
 from .models import Article
 
 WORD_CHARS = "0-9a-zа-яё"
+STORY_COUNT = 10
 
 
 def _term_matches(text: str, term: str) -> bool:
@@ -42,9 +43,7 @@ def _validate_editorial_policy(result: dict, articles_by_id: dict[str, Article],
                 f"В выпуск попала новость, запрещённая редакционной политикой: {', '.join(blocked_flags)}."
             )
 
-    generated_text = "\n".join(
-        [*(result.get("title_options") or []), *[story.get("text", "") for story in result.get("stories", [])]]
-    )
+    generated_text = "\n".join(story.get("text", "") for story in result.get("stories", []))
     checks = {
         "запрещённые организации": policy.get("blocked_organization_terms", []),
         "политические маркеры": policy.get("political_terms", []),
@@ -107,8 +106,8 @@ def _codex_command() -> list[str]:
 
 
 def generate(project: Path, articles: list[Article], start: date, end: date) -> dict:
-    if len(articles) < 8:
-        raise RuntimeError(f"Собрано только {len(articles)} уникальных релевантных новостей; нужно минимум 8.")
+    if len(articles) < STORY_COUNT:
+        raise RuntimeError(f"Собрано только {len(articles)} уникальных релевантных новостей; нужно минимум {STORY_COUNT}.")
     profile = json.loads((project / "profile" / "style_profile.json").read_text(encoding="utf-8"))
     template = (project / "prompts" / "generate_digest.md").read_text(encoding="utf-8")
     payload = {
@@ -126,11 +125,11 @@ def generate(project: Path, articles: list[Article], start: date, end: date) -> 
         ]
         subprocess.run(command, input=prompt, text=True, check=True)
         result = json.loads(output.read_text(encoding="utf-8"))
-    if len(result.get("stories", [])) != 8 or len(result.get("title_options", [])) != 10:
-        raise RuntimeError("Codex вернул неполный выпуск: ожидалось 8 новостей и 10 заголовков.")
+    if len(result.get("stories", [])) != STORY_COUNT:
+        raise RuntimeError(f"Codex вернул неполный выпуск: ожидалось {STORY_COUNT} новостей.")
     by_id = {article.id: article for article in articles}
     chosen_ids = [story.get("candidate_id") for story in result["stories"]]
-    if len(set(chosen_ids)) != 8 or any(candidate_id not in by_id for candidate_id in chosen_ids):
+    if len(set(chosen_ids)) != STORY_COUNT or any(candidate_id not in by_id for candidate_id in chosen_ids):
         raise RuntimeError("Codex вернул повторяющийся или неизвестный candidate_id.")
     if not any(story.get("story_role") == "entertaining" for story in result["stories"]):
         raise RuntimeError("Codex не включил обязательную развлекательную технологическую новость.")

@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     if not profile_is_current(PROFILE, CORPUS):
         print("Корпус изменился: один раз обновляю профиль стиля через Codex…", flush=True)
         learn_profile(PROJECT, CORPUS)
-    print("Codex отбирает 8 сюжетов и пишет выпуск…", flush=True)
+    print("Codex отбирает 10 сюжетов и пишет выпуск…", flush=True)
     result = generate(PROJECT, articles, start, end)
     result["period"] = {"from": start.isoformat(), "to": end.isoformat()}
     output_json = PROJECT / "outputs" / f"digest_{start}_{end}.json"
@@ -99,4 +99,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -2,11 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["title_options", "stories"],
+  "required": ["stories"],
   "properties": {
-    "title_options": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"type": "string", "minLength": 3}},
     "stories": {
-      "type": "array", "minItems": 8, "maxItems": 8,
+      "type": "array", "minItems": 10, "maxItems": 10,
       "items": {
         "type": "object", "additionalProperties": false,
         "required": ["candidate_id", "text", "link_text", "story_role", "source", "url", "published_date"],
