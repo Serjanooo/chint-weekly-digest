@@ -5,6 +5,13 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectDir
 
+if ($env:LOCALAPPDATA) {
+    $CacheRoot = Join-Path $env:LOCALAPPDATA "CHINTWeeklyDigest"
+} else {
+    $CacheRoot = Join-Path $env:USERPROFILE ".chint-weekly-digest"
+}
+$VenvDir = Join-Path $CacheRoot "venv"
+
 function Wait-BeforeExit {
     Write-Host ""
     Read-Host "Нажмите Enter, чтобы закрыть окно"
@@ -54,22 +61,23 @@ function Ensure-Codex {
 }
 
 function New-Venv {
-    $venvPython = Join-Path $ProjectDir ".venv\Scripts\python.exe"
+    $venvPython = Join-Path $VenvDir "Scripts\python.exe"
     if (Test-Path $venvPython) {
         return $venvPython
     }
 
     Write-Host "Первый запуск: создаю локальное окружение Python..."
+    New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
 
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
     if ($pyLauncher) {
-        & $pyLauncher.Source -3 -m venv .venv
+        & $pyLauncher.Source -3 -m venv $VenvDir
     } else {
         $python = Get-Command python -ErrorAction SilentlyContinue
         if (-not $python) {
             throw "Python 3.10+ не найден. Установите Python с python.org и включите пункт Add python.exe to PATH."
         }
-        & $python.Source -m venv .venv
+        & $python.Source -m venv $VenvDir
     }
 
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $venvPython)) {
@@ -88,7 +96,7 @@ try {
     & $python -c "import digest, docx, googlenewsdecoder" *> $null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Устанавливаю компоненты программы..."
-        & $python -m pip install -e .
+        & $python -m pip install -e $ProjectDir
         if ($LASTEXITCODE -ne 0) {
             throw "Не удалось установить компоненты программы."
         }
